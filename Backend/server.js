@@ -50,15 +50,15 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-// const path = require('path');
+const path = require('path');
 
-// // Serve static files from the React app
-// app.use(express.static(path.join(__dirname, 'build')));
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, 'build')));
 
-// // Catch-all handler to serve React's index.html for any route not handled by backend
-// app.get('*', (req, res) => {
-//   res.sendFile(path.join(__dirname, 'build', 'index.html'));
-// });
+// Catch-all handler to serve React's index.html for any route not handled by backend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 
 
