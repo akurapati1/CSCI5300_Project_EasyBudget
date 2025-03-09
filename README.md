@@ -138,8 +138,6 @@ License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 Contact
-For any questions or feedback, please contact [yourname@example.com].
+For any questions or feedback, please contact [abhilash.kurapati@slu.edu].
 
-javascript
 
-Replace placeholders like `yourusername`, `your_mongodb_connection_string`, `your_jwt_secret`, and `yourname@example.com` with your actual values. This `README.md` file provides a comprehensive guide for setting up and using your application.
