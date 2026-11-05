@@ -1,64 +1,29 @@
-name: CSCI5300 Build Runner
+name: CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  client:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Get Latest Code from Repo
-      uses: actions/checkout@v2
-    - name: Setup Node.Js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '16'
-    - name: Install Client Dependencies
-      run: npm install --prefix client
-    - name: Run Client Unit Tests
-      run: npm test --prefix client  # Run client unit tests
-    - name: Build Frontend
-      run: CI=false npm run build --prefix client
-    - name: Archive Client Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: client-build
-        path: client/build  # Adjust path as necessary
-
   backend:
     runs-on: ubuntu-latest
+    defaults: { run: { working-directory: Backend } }
     steps:
-    - name: Get Latest Code from Repo
-      uses: actions/checkout@v2
-    - name: Setup Node.Js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '14'
-    - name: Install Backend Dependencies
-      run: npm install --prefix Backend  # Adjusted to match folder name
-    - name: Run Backend Unit Tests
-      run: npm test --prefix Backend  # Adjusted to match folder name
-    - name: Archive Backend Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: backend-artifacts
-        path: Backend/build  # Adjusted to match folder name
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: Backend/package-lock.json }
+      - run: npm ci
+      - run: npm test
 
-  deploy:
+  client:
     runs-on: ubuntu-latest
-    needs: [client, backend]  # Ensure this runs after client and backend jobs
+    defaults: { run: { working-directory: client } }
     steps:
-    - name: Deploy Frontend to GitHub Pages
-      run: |
-        echo "Deploying Frontend..."
-        echo "Frontend cannot be deployed on github pages."
-
-    - name: Deploy Backend (Optional)
-      run: |
-        echo "Deploying Backend..."
-        echo "Backend cannot be deployed on github pages as github pages is only for static websites."
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm, cache-dependency-path: client/package-lock.json }
+      - run: npm ci
+      - run: CI=true npm test -- --watchAll=false
+      - run: CI=false npm run build

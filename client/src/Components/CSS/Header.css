@@ -1,17 +1,1 @@
-.header {
-  height: 60px;
-    background-color: #d4a373;
-    color: white;
-    text-align: center;
-    padding: 1rem;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    z-index: 1000; /* Ensure it stays on top of other elements */
-  }
-
-  .header:hover {
-    background-color: #bc6c25;
-  }
-  
+/* Header styles are handled by Dashboard.css sidebar/topbar */

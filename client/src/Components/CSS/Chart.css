@@ -1,49 +1,11 @@
-/* Chart.css */
-
-.charts {
-  margin: 20px;
-  padding: 10px; /* Padding around the charts */
-  
-}
-
-h2 {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.chart-container {
-  display: flex;
-  flex-wrap: wrap; /* Allows charts to wrap if needed */
-  gap: 20px; /* Space between chart containers */
-  justify-content: center; /* Centers the chart containers */
-  margin-bottom: 20px;
-}
-
-.chart-container > div {
-  flex: 1;
-  min-width: 350px; /* Minimum width for each chart */
-  max-width: 500px; /* Maximum width for each chart */
-  margin: 0 10px;
-}
-
-.chart-group {
-  display: flex;
-  gap: 20px; /* Space between charts in the group */
+.chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
 }
 
 @media (max-width: 768px) {
-  .chart-container {
-    flex-direction: column;
-    align-items: center; /* Center-aligns chart containers in column layout */
-  }
-
-  .chart-group {
-    flex-direction: column; /* Stack charts vertically on small screens */
-    gap: 10px; /* Reduce space between charts on small screens */
-  }
-
-  .chart-container > div {
-    max-width: 100%;
-    margin-bottom: 20px;
+  .chart-row {
+    grid-template-columns: 1fr;
   }
 }
