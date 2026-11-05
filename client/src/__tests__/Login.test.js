@@ -1,78 +1,62 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom'; // Use MemoryRouter for testing
+import { MemoryRouter } from 'react-router-dom';
+import Login from '../Components/Login';
 import { UserContext } from '../context/UserContext';
 import { AuthContext } from '../context/AuthContext';
-import Login from '../Components/Login';
-import fetchMock from 'jest-fetch-mock';
 
-fetchMock.enableMocks();
+const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
     ...jest.requireActual('react-router-dom'),
-    useNavigate: () => jest.fn(),
-  }));
-describe('Login Component', () => {
-    const mockDispatch = jest.fn();
-    const mockLogin = jest.fn();
-    const mockNavigate = jest.fn();
+    useNavigate: () => mockNavigate,
+}));
 
-    const userContextValue = { dispatch: mockDispatch };
-    const authContextValue = { login: mockLogin };
+const setup = () => {
+    const dispatch = jest.fn();
+    const login = jest.fn();
+    render(
+        <MemoryRouter>
+            <UserContext.Provider value={{ dispatch }}>
+                <AuthContext.Provider value={{ login }}>
+                    <Login />
+                </AuthContext.Provider>
+            </UserContext.Provider>
+        </MemoryRouter>
+    );
+    fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'ada' } });
+    fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'Str0ng!Pass' } });
+    fireEvent.submit(screen.getByTestId('login-form'));
+    return { dispatch, login };
+};
 
-    // Mock useNavigate hook
-    jest.mock('react-router-dom', () => ({
-        ...jest.requireActual('react-router-dom'),
-        useNavigate: () => mockNavigate,
-    }));
+beforeEach(() => {
+    mockNavigate.mockReset();
+});
 
-    const renderComponent = () => {
-        render(
-            <MemoryRouter>
-                <UserContext.Provider value={userContextValue}>
-                    <AuthContext.Provider value={authContextValue}>
-                        <Login />
-                    </AuthContext.Provider>
-                </UserContext.Provider>
-            </MemoryRouter>
-        );
-    };
-
-    beforeEach(() => {
-        fetchMock.resetMocks();
-        jest.clearAllMocks(); // Clear mocks to avoid interference between tests
+test('successful login stores the user and goes to the dashboard', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: 'jwt', user: { username: 'ada', income: [] } }),
     });
+    const { dispatch, login } = setup();
 
-    test('renders Login component correctly', () => {
-        renderComponent();
-        expect(screen.getByRole('heading', { name: /sign in/i })).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('Username')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText('Password')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/dashboard/home'));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_USER', payload: { user: { username: 'ada', income: [] }, token: 'jwt' } });
+    expect(login).toHaveBeenCalledWith({ username: 'ada', token: 'jwt' });
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({ username: 'ada', password: 'Str0ng!Pass' });
+});
 
-    test('input fields update correctly', () => {
-        renderComponent();
-        fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'password123' } });
+test('shows the server error message when credentials are rejected', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, json: async () => ({ message: 'Invalid credentials.' }) });
+    setup();
 
-        expect(screen.getByPlaceholderText('Username').value).toBe('testuser');
-        expect(screen.getByPlaceholderText('Password').value).toBe('password123');
-    });
+    expect(await screen.findByText('Invalid credentials.')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+});
 
-    test('shows alert on failed login', async () => {
-        fetchMock.mockResponseOnce('', { status: 400 }); // Mock a failed response
+test('shows a friendly message when the server is unreachable', async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error('network down'));
+    setup();
 
-        // Mock alert
-        jest.spyOn(window, 'alert').mockImplementation(() => {});
-
-        renderComponent();
-
-        fireEvent.change(screen.getByPlaceholderText('Username'), { target: { value: 'testuser' } });
-        fireEvent.change(screen.getByPlaceholderText('Password'), { target: { value: 'password123' } });
-        fireEvent.click(screen.getByRole('button', { name: /Sign In/i }));
-
-        await waitFor(() => {
-            expect(window.alert).toHaveBeenCalledWith('Login failed');
-        });
-    });
-
-    });
+    expect(await screen.findByText(/unable to connect/i)).toBeInTheDocument();
+});

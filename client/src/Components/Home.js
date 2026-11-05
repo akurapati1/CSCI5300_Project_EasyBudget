@@ -1,280 +1,225 @@
-import React, { useContext, useState } from "react";
-import { UserContext } from "../context/UserContext";
-import CalendarComponent from "./Calendar";
-import axios from "axios";
-import { Link } from "react-router-dom";
-import Chart from "./Pages/Chart";
-
+import React, { useContext, useState } from 'react';
+import { UserContext } from '../context/UserContext';
+import CalendarComponent from './Calendar';
+import './CSS/Home.css';
 
 const Home = ({ user }) => {
-  const { state, dispatch } = useContext(UserContext);
+  const { state, addIncome, addExpense, deleteIncome, deleteExpense } = useContext(UserContext);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [showOptionForm, setShowOptionForm] = useState(false);
-  const [showIncomeForm, setShowIncomeForm] = useState(false);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [frequency, setFrequency] = useState("monthly");
+  const [modal, setModal] = useState(null); // 'option' | 'income' | 'expense'
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [frequency, setFrequency] = useState('monthly');
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('income');
 
   const handleDateClick = (date) => {
     setSelectedDate(date);
-    setShowOptionForm(true);
+    setModal('option');
   };
 
-  const handleOptionSelect = (option) => {
-    setShowOptionForm(false);
-    if (option === "income") {
-      setShowIncomeForm(true);
-    } else if (option === "expense") {
-      setShowExpenseForm(true);
-    }
+  const closeModal = () => {
+    setModal(null);
+    setAmount('');
+    setDescription('');
+    setFrequency('monthly');
   };
 
-  const handleAddIncome = () => {
-    const data = {
-      userId: user.id,
-      date: selectedDate,
-      amount: parseFloat(amount),
-      description: description,
-      frequency: frequency,
-    };
-    
-    
-    axios
-      .post("https://csci5300-project-easybudget.onrender.com/api/budget/income", data)
-      .then(() => {
-        dispatch({
-          type: "ADD_INCOME",
-          payload: { date: selectedDate, amount: parseFloat(amount), description: description, frequency: frequency },
-        });
-        setShowIncomeForm(false);
-        setAmount("");
-        setDescription("");
-        setFrequency("monthly");
-      })
-      .catch((error) => {
-        console.error("Error adding income:", error);
-      });
-  };
-
-  const handleAddExpense = () => {
-    const data = {
-      userId: user.id,
-      date: selectedDate,
-      amount: parseFloat(amount),
-      description: description,
-      frequency: frequency,
-    };
-    axios
-      .post("https://csci5300-project-easybudget.onrender.com/api/budget/expense", data)
-      .then(() => {
-        dispatch({
-          type: "ADD_EXPENSE",
-          payload: { date: selectedDate, amount: parseFloat(amount), description: description, frequency: frequency },
-        });
-        setShowExpenseForm(false);
-        setAmount("");
-        setDescription("");
-        setFrequency("monthly");
-      })
-      .catch((error) => {
-        console.error("Error adding expense:", error);
-      });
-  };
-
-  const calculateMonthlyTotals = (transactions) => {
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
-    console.log("in calculate monthy totals methods, the transaction are :",transactions);
-
-    return transactions.reduce((total, transaction) => {
-      const transactionDate = new Date(transaction.date);
-      if (
-        transactionDate.getMonth() === currentMonth &&
-        transactionDate.getFullYear() === currentYear
-      ) {
-        if(transaction.frequency === 'bi-weekly'){
-          console.log("the transaction amount is : ",transaction.amount);
-          total += transaction.amount * 2;
-        } 
-        else if(transaction.frequency === 'weekly'){
-          total += transaction.amount * 4;
-        }
-        else{
-          total += transaction.amount;
-        }
+  const calcMonthly = (transactions) => {
+    const now = new Date();
+    return transactions.reduce((total, t) => {
+      const d = new Date(t.date);
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        if (t.frequency === 'bi-weekly') return total + t.amount * 2;
+        if (t.frequency === 'weekly') return total + t.amount * 4;
+        return total + t.amount;
       }
       return total;
     }, 0);
   };
-  console.log("the state total income is :",state.income);
 
-  const totalIncome = calculateMonthlyTotals(state.income);
-  const totalExpenses = calculateMonthlyTotals(state.expenses);
+  const totalIncome = calcMonthly(state.income);
+  const totalExpenses = calcMonthly(state.expenses);
+  const net = totalIncome - totalExpenses;
 
-  const calculateForecast = () => {
-    const projectedIncome = totalIncome;
-    const projectedExpenses = totalExpenses;
-    const forecast = projectedIncome - projectedExpenses;
-    console.log("the projected income and expenses are : ",totalIncome, totalExpenses);
-    return { projectedIncome, projectedExpenses, forecast };
+  const handleSubmit = async (type) => {
+    if (!amount || !description) return;
+    setLoading(true);
+    try {
+      const payload = {
+        date: selectedDate || new Date(),
+        amount: parseFloat(amount),
+        description,
+        frequency
+      };
+      if (type === 'income') await addIncome(payload);
+      else await addExpense(payload);
+      closeModal();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const { projectedIncome, projectedExpenses, forecast } = calculateForecast();
+  const formatDate = (date) =>
+    new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const formatDate = (date) => {
-    const options = { year: "numeric", month: "short", day: "numeric" };
-    return new Date(date).toLocaleDateString(undefined, options);
-  };
+  const currentMonthTransactions = (list) =>
+    list.filter(t => {
+      const d = new Date(t.date);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
 
-  // const incomeData = state.income
-  //   .filter((income) => {
-  //     const date = new Date(income.date);
-  //     return date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear();
-  //   });
-
-  // const expenseData = state.expenses
-  //   .filter((expense) => {
-  //     const date = new Date(expense.date);
-  //     return date.getMonth() === new Date().getMonth() && date.getFullYear() === new Date().getFullYear();
-  //   });
+  const incomeThisMonth = currentMonthTransactions(state.income);
+  const expensesThisMonth = currentMonthTransactions(state.expenses);
 
   return (
-    <div className="home">
-      <CalendarComponent onDateClick={handleDateClick} />
-
-      <div className="forecast">
-        <h2>Monthly Budget Forecast</h2>
-        <p>Projected Income: ${projectedIncome.toFixed(2)}</p>
-        <p>Projected Expenses: ${projectedExpenses.toFixed(2)}</p>
-        <p>
-          {forecast >= 0
-            ? `Projected Savings: $${forecast.toFixed(2)}`
-            : `Projected Deficit: $${Math.abs(forecast).toFixed(2)}`}
-        </p>
-      </div>
-
-      <div className="monthly-transactions">
-        <h2>Monthly Transactions</h2>
-        <div className="monthly-income">
-          <h3>Income</h3>
-          <ul>
-            {state.income
-              .filter((income) => {
-                const date = new Date(income.date);
-                return (
-                  date.getMonth() === new Date().getMonth() &&
-                  date.getFullYear() === new Date().getFullYear()
-                );
-              })
-              .map((income, index) => (
-                <li key={index}>
-                  Date: {formatDate(income.date)}<br />
-                  Amount: ${income.amount.toFixed(2)}<br/>  
-                  Description: {income.description}<br/>
-                  Frequency: {income.frequency}<br/>
-                  <li style={{listStyleType: "none"}}>-------------------------------------------------</li>
-                </li>
-              ))}
-          </ul>
+    <div>
+      {/* Stat Cards */}
+      <div className="stat-cards">
+        <div className="stat-card">
+          <div className="stat-label">Monthly Income</div>
+          <div className="stat-value income">${totalIncome.toFixed(2)}</div>
         </div>
-        <div className="monthly-expenses">
-          <h3>Expenses</h3>
-          <ul>
-            {state.expenses
-              .filter((expense) => {
-                const date = new Date(expense.date);
-                return (
-                  date.getMonth() === new Date().getMonth() &&
-                  date.getFullYear() === new Date().getFullYear()
-                );
-              })
-              .map((expense, index) => (
-                <li key={index}>
-                  Date: {formatDate(expense.date)}<br />
-                  Amount: ${expense.amount.toFixed(2)}<br/>  
-                  Description: {expense.description}<br/>
-                  Frequency: {expense.frequency}<br/>
-                  <li style={{listStyleType: "none"}}>-------------------------------------------------</li>
-                </li>
-              ))}
-          </ul>
+        <div className="stat-card">
+          <div className="stat-label">Monthly Expenses</div>
+          <div className="stat-value expense">${totalExpenses.toFixed(2)}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">{net >= 0 ? 'Net Savings' : 'Deficit'}</div>
+          <div className={`stat-value ${net >= 0 ? 'savings' : 'deficit'}`}>
+            {net >= 0 ? '+' : '-'}${Math.abs(net).toFixed(2)}
+          </div>
         </div>
       </div>
-      {/* <Chart incomeData={incomeData} expenseData={expenseData} /> */}
 
-      {showOptionForm && (
-        <div className="modal">
-          <h2>Select an option</h2>
-          <button
-            className="income"
-            onClick={() => handleOptionSelect("income")}
-          >
-            Add Income
-          </button>
-          <button
-            className="expense"
-            onClick={() => handleOptionSelect("expense")}
-          >
-            Add Expense
-          </button>
-          <button onClick={() => setShowOptionForm(false)}>Cancel</button>
+      <div className="home-grid">
+        {/* Calendar */}
+        <div>
+          <div className="calendar-section">
+            <div className="section-title">📅 Click a date to add a transaction</div>
+            <CalendarComponent onDateClick={handleDateClick} />
+          </div>
+        </div>
+
+        {/* Transactions */}
+        <div className="transactions-section">
+          <div className="section-title">This Month</div>
+          <div className="transactions-tabs">
+            <button
+              className={`tab-btn ${activeTab === 'income' ? 'active' : ''}`}
+              onClick={() => setActiveTab('income')}
+            >
+              Income ({incomeThisMonth.length})
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'expense' ? 'active' : ''}`}
+              onClick={() => setActiveTab('expense')}
+            >
+              Expenses ({expensesThisMonth.length})
+            </button>
+          </div>
+
+          <div className="transaction-list">
+            {activeTab === 'income' && (
+              incomeThisMonth.length === 0
+                ? <div className="empty-state">No income recorded this month</div>
+                : incomeThisMonth.map((item, i) => (
+                  <div className="transaction-item" key={item._id || i}>
+                    <div className="transaction-info">
+                      <span className="transaction-desc">{item.description}</span>
+                      <span className="transaction-meta">
+                        {formatDate(item.date)}
+                        <span className="freq-badge">{item.frequency}</span>
+                      </span>
+                    </div>
+                    <div className="transaction-right">
+                      <span className="transaction-amount income">+${item.amount.toFixed(2)}</span>
+                      {item._id && (
+                        <button className="delete-btn" onClick={() => deleteIncome(item._id)} title="Delete">✕</button>
+                      )}
+                    </div>
+                  </div>
+                ))
+            )}
+            {activeTab === 'expense' && (
+              expensesThisMonth.length === 0
+                ? <div className="empty-state">No expenses recorded this month</div>
+                : expensesThisMonth.map((item, i) => (
+                  <div className="transaction-item" key={item._id || i}>
+                    <div className="transaction-info">
+                      <span className="transaction-desc">{item.description}</span>
+                      <span className="transaction-meta">
+                        {formatDate(item.date)}
+                        <span className="freq-badge">{item.frequency}</span>
+                      </span>
+                    </div>
+                    <div className="transaction-right">
+                      <span className="transaction-amount expense">-${item.amount.toFixed(2)}</span>
+                      {item._id && (
+                        <button className="delete-btn" onClick={() => deleteExpense(item._id)} title="Delete">✕</button>
+                      )}
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {modal === 'option' && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h2>Add Transaction for {selectedDate ? formatDate(selectedDate) : 'today'}</h2>
+            <div className="modal-actions">
+              <button className="btn-income" onClick={() => setModal('income')}>+ Income</button>
+              <button className="btn-expense" onClick={() => setModal('expense')}>+ Expense</button>
+              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
 
-      {showIncomeForm && (
-        <div className="modal">
-          <h2>Add Income</h2>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Amount Earned"
-          />
-          <input
-            type="text" 
-            value={description} 
-            onChange={(e) => setDescription(e.target.value)} 
-            placeholder="Income Source" 
-          />
-          <select 
-            value={frequency} 
-            onChange={(e) => setFrequency(e.target.value)}
-          >
-            <option value="monthly">Monthly</option>
-            <option value="bi-weekly">Bi-weekly</option>
-            <option value="weekly">Weekly</option>
-          </select>
-          <button className="income" onClick={handleAddIncome}>Add Income</button>
-          <button onClick={() => setShowIncomeForm(false)}>Cancel</button>
-        </div>
-      )}
-
-      {showExpenseForm && (
-        <div className="modal">
-          <h2>Add Expense</h2>
-          <input
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="Amount Spent"
-          />
-          <input
-            type="text" 
-            value={description} 
-            onChange={(e) => setDescription(e.target.value)} 
-            placeholder="Money Spent on What" 
-          />
-          <select 
-            value={frequency} 
-            onChange={(e) => setFrequency(e.target.value)}
-          >
-            <option value="monthly">Monthly</option>
-            <option value="bi-weekly">Bi-weekly</option>
-            <option value="weekly">Weekly</option>
-          </select>
-          <button className="expense" onClick={handleAddExpense}>Add Expense</button>
-          <button onClick={() => setShowExpenseForm(false)}>Cancel</button>
+      {(modal === 'income' || modal === 'expense') && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <h2>{modal === 'income' ? '💰 Add Income' : '💸 Add Expense'}</h2>
+            <input
+              className="modal-input"
+              type="number"
+              placeholder="Amount"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              min="0.01"
+              step="0.01"
+              autoFocus
+            />
+            <input
+              className="modal-input"
+              type="text"
+              placeholder={modal === 'income' ? 'Income source (e.g. Salary)' : 'What was it for?'}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+            />
+            <select className="modal-select" value={frequency} onChange={e => setFrequency(e.target.value)}>
+              <option value="monthly">Monthly</option>
+              <option value="bi-weekly">Bi-weekly</option>
+              <option value="weekly">Weekly</option>
+            </select>
+            <div className="modal-actions">
+              <button
+                className={modal === 'income' ? 'btn-income' : 'btn-expense'}
+                onClick={() => handleSubmit(modal)}
+                disabled={!amount || !description || loading}
+              >
+                {loading ? 'Saving...' : `Add ${modal === 'income' ? 'Income' : 'Expense'}`}
+              </button>
+              <button className="btn-cancel" onClick={closeModal}>Cancel</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
